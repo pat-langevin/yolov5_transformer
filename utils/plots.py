@@ -22,7 +22,7 @@ from utils.general import xywh2xyxy, xyxy2xywh
 from utils.metrics import fitness
 
 # Settings
-matplotlib.rc('font', **{'size': 11})
+matplotlib.rc('font', **{'size': 3})
 matplotlib.use('Agg')  # for writing to files only
 
 
@@ -57,6 +57,7 @@ def butter_lowpass_filtfilt(data, cutoff=1500, fs=50000, order=5):
 def plot_one_box(x, img, color=None, label=None, line_thickness=3):
     # Plots one bounding box on image img
     tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
+    tl = 1
     color = color or [random.randint(0, 255) for _ in range(3)]
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
     cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
@@ -75,7 +76,8 @@ def plot_one_box_PIL(box, img, color=None, label=None, line_thickness=None):
     draw.rectangle(box, width=line_thickness, outline=tuple(color))  # plot
     if label:
         fontsize = max(round(max(img.size) / 40), 8)
-        font = ImageFont.truetype("Arial.ttf", fontsize)
+        # font = ImageFont.truetype("Arial.ttf", fontsize)
+        font = ImageFont.truetype("Arial.ttf", 3)
         txt_width, txt_height = font.getsize(label)
         draw.rectangle([box[0], box[1] - txt_height + 4, box[0] + txt_width, box[1]], fill=tuple(color))
         draw.text((box[0], box[1] - txt_height + 1), label, fill=(255, 255, 255), font=font)
@@ -123,7 +125,7 @@ def plot_images(images, targets, paths=None, fname='images.jpg', names=None, max
     if np.max(images[0]) <= 1:
         images *= 255
 
-    tl = 3  # line thickness
+    tl = 2  # line thickness
     tf = max(tl - 1, 1)  # font thickness
     bs, _, h, w = images.shape  # batch size, _, height, width
     bs = min(bs, max_subplots)  # limit plot images
