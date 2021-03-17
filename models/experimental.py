@@ -148,9 +148,9 @@ class TransformerLayer(nn.Module):
         self.q = nn.Linear(c, c, bias=False) #query cible
         self.k = nn.Linear(c, c, bias=False) #keys source
         self.v = nn.Linear(c, c, bias=False) #values source
+        
         # from the paper
         self.ma = nn.MultiheadAttention(embed_dim=c, num_heads=num_heads)
-
         self.ln1 = nn.LayerNorm(c)
         self.ln2 = nn.LayerNorm(c)
         self.fc1 = nn.Linear(c, c, bias=False)
