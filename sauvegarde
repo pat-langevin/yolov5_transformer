@@ -30,7 +30,6 @@ class Track:
         self.isActive = True
         self.position_list = position_list
         self.isUsed = isUsed
-        self.step = 0
 
     def add_position(self, position:Position):
         self.position_list.append(position)
@@ -62,15 +61,6 @@ class Track:
     def getPositionList(self) -> [Position]:
         return self.position_list
 
-    def increase_step(self):
-        self.step += 1
-
-    def reset_step(self):
-        self.step = 0
-        
-    def getStep(self) -> int:
-        return self.step
-
 class Tracking:
     def __init__(self, track_list):
         self.tracking_list = track_list
@@ -95,21 +85,12 @@ class Tracking:
             if track.getId() == track_id:
                 return track
         return None
-
-    def increase_step_all_track(self):
-        for track in self.tracking_list:
-            if track.getIsActive():    
-                track.increase_step()
-                #print(track.getStep())
-                if track.getStep() >= 100:
-                    #print("False")
-                    track.setIsActive(False)
     
     def getBestTrackID(self, position:Position) -> int:
         id_list = []
         score_list = []
         for track in self.tracking_list:
-            if track.getIsUsed() == False and track.getIsActive() == True:
+            if track.getIsUsed() == False:
                 last = track.last_position()
                 id_list.append(track.getId())
                 score_list.append(position.score(last))
@@ -119,7 +100,7 @@ class Tracking:
         if(len(id_list) == 0):
             return 0
 
-        if(min(score_list) >= 15):
+        if(min(score_list) >= 40):
             return 0
         #print("----get best track----")
         #print(id_list)
@@ -238,7 +219,7 @@ def detect(save_img=False):
                     pos = Position(x, y)
 
                     track_id = tracking_struct.getBestTrackID(pos)
-                    #print(track_id)
+                    print(track_id)
                     color = []
                     track = None
                     if (track_id == 0):
@@ -254,13 +235,12 @@ def detect(save_img=False):
                         track = tracking_struct.getTrack(track_id)
                         color = track.getColor()
                         track.add_position(pos)
-                        track.reset_step()
                         track.setIsUsed(True)
 
                     position_track_list = track.getPositionList()
                     if (len(position_track_list) >= 2) :
                         #print("plusieurs")
-                        #print(track_id)
+                        print(track_id)
                         for i in range(len(position_track_list) - 1):
                             initial = position_track_list[i]
                             final = position_track_list[i+1]
@@ -276,7 +256,6 @@ def detect(save_img=False):
                         plot_one_box_and_dot(xyxy, (x, y), im0, track_id, color, label=label, line_thickness=3)
                     #print("reset tracks")
                     tracking_struct.reset_tracks()
-                tracking_struct.increase_step_all_track()
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({t2 - t1:.3f}s)') # remove to see prints
@@ -340,3 +319,4 @@ if __name__ == '__main__':
                 strip_optimizer(opt.weights)
         else:
             detect()
+
