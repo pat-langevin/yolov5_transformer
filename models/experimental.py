@@ -133,61 +133,92 @@ def attempt_load(weights, map_location=None):
             setattr(model, k, getattr(model[-1], k))
         return model  # return ensemble
 
-
 # Experiements for project
-class Transformer(CSPBottleneck3Conv):
+# initialize transformer block with a CSP block as a backbone
+class TF(CSPBottleneck3Conv):
+    # initialize transformer block
     def __init__(self, c1, c2, n=1, shortcut=True, g=1, e=0.5):
+        # added a CSP layer
         super().__init__(c1, c2, n, shortcut, g, e)
         c_ = int(c2 * e)
-        self.m = TransformerBlock(c_, c_, 4, n)
+        # create transforemer block
+        self.m = TFBlock(c_, c_, 4, n)
 
-class TransformerLayer(nn.Module):
+# transformer layer class
+class TFLayer(nn.Module):
+    # initialize layer
     def __init__(self, c, num_heads):
         super().__init__()
         # transformer parameters and components
-        self.q = nn.Linear(c, c, bias=False) #query cible
+        self.q = nn.Linear(c, c, bias=False) #query target
         self.k = nn.Linear(c, c, bias=False) #keys source
         self.v = nn.Linear(c, c, bias=False) #values source
         
         # from the paper
+        # multihead structure
         self.ma = nn.MultiheadAttention(embed_dim=c, num_heads=num_heads)
+        # normalization structure
         self.ln1 = nn.LayerNorm(c)
         self.ln2 = nn.LayerNorm(c)
+        # linear structures
         self.fc1 = nn.Linear(c, c, bias=False)
         self.fc2 = nn.Linear(c, c, bias=False)
 
-    def forward(self, x):
-        x_ = self.ln1(x)
-        x = self.ma(self.q(x_), self.k(x_), self.v(x_))[0] + x
-        x = self.ln2(x)
-        x = self.fc2(self.fc1(x)) + x
-        return x
+    def forward(self, input):
+        # normalisation of input
+        ln1_output = self.ln1(input)
+        # using the keys, query, and values as input to the 
+        # multihead attention machanism
+        ma_output = self.ma(self.q(ln1_output), self.k(ln1_output), self.v(ln1_output))[0] + input
+        # normalisation of multihead output
+        ln2_output = self.ln2(ma_output)
+        # linearization of normalisation output
+        output = self.fc2(self.fc1(ln2_output)) + ln2_output
+        # return output
+        return output
 
-
-class TransformerBlock(nn.Module):
+# transformer block class
+# create a block of transformer based on the layers
+class TFBlock(nn.Module):
     def __init__(self, c1, c2, num_heads, num_layers):
         super().__init__()
 
+        # standard convolution if input
+        # and output are not equal
         self.conv = None
         if c1 != c2:
             self.conv = Conv(c1, c2)
+        # linearisation of input
         self.linear = nn.Linear(c2, c2)
-        self.tr = nn.Sequential(*[TransformerLayer(c2, num_heads) for _ in range(num_layers)])
+        # create sequence of multiple layer of transformer
+        self.tr = nn.Sequential(*[TFLayer(c2, num_heads) for _ in range(num_layers)])
+        # set output size
         self.c2 = c2
 
-    def forward(self, x):
+    def forward(self, input):
         if self.conv is not None:
-            x = self.conv(x)
-        b, _, w, h = x.shape
-        p = x.flatten(2)
+            input = self.conv(input)
+        # rshape of tensor
+        b, _, w, h = input.shape
+        p = input.flatten(2)
+        # reformat tensor
         p = p.unsqueeze(0)
+        # transpose the tensor
         p = p.transpose(0, 3)
+        # remove dimensition of size 3
         p = p.squeeze(3)
+        # linear
         e = self.linear(p)
-        x = p + e
+        # add linear value
+        input = p + e
 
-        x = self.tr(x)
-        x = x.unsqueeze(3)
-        x = x.transpose(0, 3)
-        x = x.reshape(b, self.c2, w, h)
-        return x
+        # sequential
+        input = self.tr(input)
+        # reformat tensor
+        input = input.unsqueeze(3)
+        # transpose
+        input = input.transpose(0, 3)
+        # reshape
+        input = input.reshape(b, self.c2, w, h)
+        # return output
+        return input

@@ -15,87 +15,119 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box_and_dot, plot_line
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
+# class for a positon
 class Position:
+    # initialization of a position
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
+    # find the score from a point to this point
+    # based on the pytagore
     def score(self, position:'Position') -> float:
         return math.sqrt((self.x - position.x)**2 + (self.y - position.y)**2)
 
+# class of a track
+# is used to keep all the values needed to draw a track on a frame
+# keeps the statuses
 class Track:
+    # initialization of a track
     def __init__(self, color, track_id, isUsed, position_list:[Position]):
-        self.track_id = track_id
-        self.color = color
-        self.isActive = True
-        self.position_list = position_list
-        self.isUsed = isUsed
-        self.step = 0
+        self.track_id = track_id # id
+        self.color = color # the color
+        self.isActive = True # set the track to active
+        self.position_list = position_list # create an empty list of postion
+        self.isUsed = isUsed # set the used status
+        self.step = 0 # step to 0
 
+    # add a point/position to a track
     def add_position(self, position:Position):
         self.position_list.append(position)
 
+    # return latest point added to the track, otherwise none
     def last_position(self) -> Position:
         if(len(self.position_list) == 0):
             return None
         else:
             return self.position_list[-1]
     
+    # get if a track is active
     def getIsActive(self) -> bool:
         return self.isActive
 
+    # set active status
     def setIsActive(self, isActive):
         self.isActive = isActive
     
+    # return the id
     def getId(self) -> int:
         return self.track_id
     
+    # set the status for a frame
     def setIsUsed(self, value:bool):
         self.isUsed = value
     
+    # return the status
     def getIsUsed(self) -> bool:
         return self.isUsed
     
+    # return the color
     def getColor(self):
         return self.color
 
+    # return all the position of the track
     def getPositionList(self) -> [Position]:
         return self.position_list
 
+    # return the steps, used to set a track
+    # to inactive
     def increase_step(self):
         self.step += 1
 
+    # set the step to 0, to keep it active
     def reset_step(self):
         self.step = 0
         
+    # return number of steps
     def getStep(self) -> int:
         return self.step
 
+# The algorithm to manage the tracks to be drawn on a frame
 class Tracking:
+    # empty list of tracks
     def __init__(self, track_list):
         self.tracking_list = track_list
 
+    # add a track to the track list
     def add_track(self, track:Track):
         self.tracking_list.append(track)
     
+    # return the track  list
     def get_tracking_list(self) -> []:
         return self.tracking_list
     
+    # add a position to a track
     def add_to_track(self, track_id, position:Position):
         for track in self.tracking_list:
             if(track.getId() == track_id and track.getIsActive()):
                 track.add_position(position)
 
+    # reset the used status of all the tracks to false
+    # to be used for the next frame
     def reset_tracks(self):
         for track in self.tracking_list:
             track.setIsUsed(False)
 
+    # return a track based on an id
     def getTrack(self, track_id) -> Track:
         for track in self.tracking_list:
             if track.getId() == track_id:
                 return track
         return None
 
+    # increase the steps off all the tracks
+    # if a track has 100 step, it is inactive
+    # and cannot be used again
     def increase_step_all_track(self):
         for track in self.tracking_list:
             if track.getIsActive():    
@@ -105,6 +137,9 @@ class Tracking:
                     #print("False")
                     track.setIsActive(False)
     
+    # return the id of a track based on the best score
+    # of a position and tyhe lastest point of the not
+    # used track during a frame
     def getBestTrackID(self, position:Position) -> int:
         id_list = []
         score_list = []
@@ -128,8 +163,8 @@ class Tracking:
         index = argmin(score_list)
         return id_list[index]
 
-
-def detect(save_img=False):
+# based on the detect from detection.py
+def track(save_img=False):
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
@@ -223,59 +258,71 @@ def detect(save_img=False):
                 for *xyxy, conf, cls in reversed(det):
 
                     # Tracking code
+                    # get corners of the bonding box
                     x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
-                    #print("valeur")
-                    #print(x1)
-                    #print(y1)
-                    #print(x2)
-                    #print(y2)
-                    #print("fin valeur")
+                    # find x center
                     x = int(x1 + (x2 - x1)/2)
+                    # find y center
                     y = int(y1 + (y2 - y1)/2)
-
-                    #print("object at (" + str(x) + ";" + str(y) + ")")
-                    #print("lenght struct track: " + str(len(tracking_struct.get_tracking_list())))
+                    # create position with center values
                     pos = Position(x, y)
-
+                    # find best track based on the position
                     track_id = tracking_struct.getBestTrackID(pos)
-                    #print(track_id)
+                    # empty color
                     color = []
+                    # null color
                     track = None
+
+                    # if no track were found
                     if (track_id == 0):
-                        #print("new track")
+                        # increase counter
                         counter += 1
+                        # randomize color
                         color = [random.randint(0, 255) for _ in range(3)]
+                        # empty new list of positon
                         list_position = []
+                        # create new track
                         new_track = Track(color, counter, True, list_position)
+                        # add postion to track
                         new_track.add_position(pos)
+                        # add track to track list
                         tracking_struct.add_track(new_track)
+                        # point track to new track
                         track = new_track
+                    # if a track was found
                     else:
+                        # find track
                         track = tracking_struct.getTrack(track_id)
+                        # get color
                         color = track.getColor()
+                        # add position
                         track.add_position(pos)
+                        # reset the step
                         track.reset_step()
+                        # used for this frame
                         track.setIsUsed(True)
 
+                    # get all the point of the track (new of found)
                     position_track_list = track.getPositionList()
+                    # if more than 2 positon, then draw lines
                     if (len(position_track_list) >= 2) :
-                        #print("plusieurs")
-                        #print(track_id)
+                        # for each position present in position list of the track
                         for i in range(len(position_track_list) - 1):
+                            # initial point
                             initial = position_track_list[i]
+                            # final point
                             final = position_track_list[i+1]
-                            #print(initial.x)
-                            #print(initial.y)
-                            #print(final.x)
-                            #print(final.y)
+                            # draw line from initial to final point on the frame
                             plot_line((initial.x, initial.y), (final.x, final.y), im0, color, 1)
 
                     if save_img or view_img:  # Add bbox to image
-                        #print("save_img")
+                        # save image to video
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box_and_dot(xyxy, (x, y), im0, track_id, color, label=label, line_thickness=3)
-                    #print("reset tracks")
+                    
+                    # reset all the track in track list
                     tracking_struct.reset_tracks()
+                # increase step in all track to find inactive
                 tracking_struct.increase_step_all_track()
 
             # Print time (inference + NMS)
@@ -330,13 +377,12 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
-    print(opt)
     check_requirements()
 
     with torch.no_grad():
         if opt.update:  # update all models (to fix SourceChangeWarning)
             for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
-                detect()
+                track()
                 strip_optimizer(opt.weights)
         else:
-            detect()
+            track()
